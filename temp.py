@@ -1,15 +1,6 @@
-import os
-import pandas as pd
 import numpy as np
-from string import ascii_lowercase as alphabet
-import pickle
 
-import tensorflow as tf
+arr = np.array([[1,2,3,4], [5,6,7,8], [9,10,11,12]])
 
-home_dir = "/media/bruno/data/chatbot_project/"
 
-os.chdir("/media/bruno/data/chatbot_project/data_sets/cornell_movie_dialogs_corpus/cornell movie-dialogs corpus")
-
-dictionary = pickle.load( open(home_dir + "dictionary.pickle", "rb" ) )
-revdictionary = pickle.load( open(home_dir + "revdictionary.pickle", "rb" ) )
-
+print(np.delete(arr, -1, 0))
