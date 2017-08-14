@@ -96,8 +96,8 @@ init = tf.global_variables_initializer()
 sess.run(init)
 
 
-r = sess.run(loss, feed_dict=feed_dict)
-
+r = sess.run(log1, feed_dict=feed_dict)
+r1 = sess.run(log2, feed_dict=feed_dict)
 
 print(r)
 

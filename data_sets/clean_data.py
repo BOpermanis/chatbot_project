@@ -60,7 +60,7 @@ def punct(x):
 tab["V5"] = tab["V5"].map(punct)
 
 
-tab["V6"] = tab["V5"].map(lambda x: [special_words[1]] + [i.replace(" ","").lower() for i in x.split(" ") if i not in [""," "]] + [special_words[3]]  )
+tab["V6"] = tab["V5"].map(lambda x: [special_words[1]] + [i.replace(" ","").lower() for i in x.split(" ") if i not in [""," "]] + [special_words[3]] )
 
 
 ############################# low frequency word treatment #################
@@ -82,25 +82,26 @@ low_freq_words = set([w for w, n in zip(list(nws.keys()), list(nws.values())) if
 tab["V6"] = tab["V6"].map(lambda sent: [special_words[4] if w in low_freq_words else w for w in sent])
 
 
-
 ############################## making a dictionary ##########################
 
-v = list(set(nws).difference(low_freq_words)) + special_words
+v = list(set(list(nws) + special_words).difference(low_freq_words))
 
 v_dict = [(i,v[i]) for i in range(len(v))]
 v_revdict = [(v[i],i) for i in range(len(v))]
 dictionary = dict(v_dict)
 revdictionary = dict(v_revdict)
 
-pickle.dump(dictionary,open(home_dir + "dictionary.pickle", "wb"))
-pickle.dump(revdictionary,open(home_dir + "revdictionary.pickle", "wb"))
+pickle.dump(dictionary, open(home_dir + "dictionary.pickle", "wb"))
+pickle.dump(revdictionary, open(home_dir + "revdictionary.pickle", "wb"))
 
-############################# Replacing words #######################
+############################# Replacing words with Indexes #######################
 
 keys = revdictionary.keys()
 
 tab["V7"] = tab["V6"].map(lambda l: [revdictionary[w] for w in l if w in keys])
 
+
+#################### Edditing Conversation data ##############################
 
 tab["V1"] = tab["V1"].map(lambda x: x.replace(" ",""))
 con_dict = dict(zip(tab["V1"].tolist(),tab["V7"].tolist()))
@@ -113,7 +114,8 @@ keys = con_dict.keys()
 
 dataset = conv["V4"].map(lambda x: [con_dict[w] for w in x if w in keys])
 
-#conv["V4"].select(lambda x: len([w for w in x if w==" "])>0)
+
+############# storing data ##############################
 
 pickle.dump(dataset,open(home_dir + "dataset.pickle", "wb"))
 
