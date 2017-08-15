@@ -8,7 +8,7 @@ embedding_dir = home_dir + "/embeddings/embeddings_checkpoint/"
 
 class embedding_model:
 
-    def __init__(self, vocabulary_size, embedding_size=512):
+    def __init__(self, vocabulary_size, embedding_size=512, train=True):
         """Initializes model, builds models graph"""
         ## some hyperparameters
         self.num_sampled = 64
@@ -18,13 +18,13 @@ class embedding_model:
         self.embedding_size = embedding_size
 
         self.embeddings = tf.Variable(
-            tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0), name="embedding_map")
+            tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0), name="embedding_map", trainable=train)
 
         self.nce_weights = tf.Variable(
             tf.truncated_normal([embedding_size,vocabulary_size],
-                                stddev=1.0 / math.sqrt(embedding_size)), name="nce_weights")
+                                stddev=1.0 / math.sqrt(embedding_size)), name="nce_weights", trainable=train)
 
-        self.nce_biases = tf.Variable(tf.zeros([vocabulary_size]), name="nce_biases")
+        self.nce_biases = tf.Variable(tf.zeros([vocabulary_size]), name="nce_biases", trainable=train)
 
         ## placeholders for data
         self.train_inputs = tf.placeholder(tf.int32, shape=[None], name="inputs")
@@ -36,11 +36,11 @@ class embedding_model:
         # mapping representation->word
         self.logits = tf.matmul(self.embed, self.nce_weights) + self.nce_biases
 
-        # Softmax cross-entropy
-        self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits, labels=self.train_labels)
-        self.loss_total = tf.reduce_mean(self.loss)
-        self.optimizer = tf.train.GradientDescentOptimizer(1.0, name="optimizer").minimize(self.loss_total)
-
+        if train:
+            # Softmax cross-entropy
+            self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits, labels=self.train_labels)
+            self.loss_total = tf.reduce_mean(self.loss)
+            self.optimizer = tf.train.GradientDescentOptimizer(1.0, name="optimizer").minimize(self.loss_total)
 
     def train(self, first_word, second_word, num_steps=50001, batch_size=10000, test_size=2000, period_show=100, save=True):
         """ trains the model, generates session in the process"""

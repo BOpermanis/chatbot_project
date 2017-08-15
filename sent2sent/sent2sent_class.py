@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 import sys, os, pickle, math
-
+import random
 
 home_dir = "/media/bruno/data/chatbot_project/"
 embedding_dir = home_dir + "embeddings/"
@@ -24,12 +24,10 @@ data_set_size = len(first_word)
 vocabulary_size = len(dictionary)
 data_set_size = len(first_word)
 
+
 embedmod = embedding_model(vocabulary_size=vocabulary_size)
 
 sess = embedmod.import_session(beeing_integrated=True)
-
-
-
 
 # placeholder for batch  :  batch_size X seq_len
 input_seq = tf.placeholder(tf.int32, shape=[None, None], name="input_seq")
@@ -53,7 +51,7 @@ encoder_cell = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
 decoder_cell = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
 
 ## ENCODING
-with tf.variable_scope("encoding"):
+with tf.variable_scope("rnn/encoding"):
     _ , thought_vector = tf.nn.dynamic_rnn(cell=encoder_cell,
                                           inputs=embed_seq,
                                           # initial_state=zero_state,
@@ -61,44 +59,53 @@ with tf.variable_scope("encoding"):
                                           time_major=True)
 
 ## DECODING
-with tf.variable_scope("decoding"):
+with tf.variable_scope("rnn/decoding"):
     decoder_output, _ = tf.nn.dynamic_rnn(cell=decoder_cell,
                                           inputs=dec_input_seq,
                                           initial_state=thought_vector,
                                           dtype=tf.float32,
                                           time_major=True)
 
-
-# logits = tf.transpose(tf.map_fn(inv_embed_fun, decoder_output, dtype=tf.float32, name="logits"), perm=[1, 0, 2])
 logits = tf.map_fn(inv_embed_fun, decoder_output, dtype=tf.float32, name="logits")
 
-log1 = tf.reshape(logits, [-1, vocabulary_size])
-log2 = tf.reshape(dec_output_seq_raw, [-1])
+loss_elem = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=tf.reshape(logits, [-1, vocabulary_size]),
+                                                           labels=tf.reshape(dec_output_seq_raw, [-1]))
+loss = tf.reduce_mean(loss_elem)
 
-loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=log1, labels=log2)
-# loss_total = tf.reduce_mean(self.loss)
-
-
-
-
-
-enc_batch = np.transpose(batches[0][0]).astype(np.int32)
-dec_batch = np.transpose(batches[0][1]).astype(np.int32)
-
-feed_dict = {
-    input_seq: enc_batch,
-    dec_input_seq_raw: np.delete(dec_batch, 0, 0),
-    dec_output_seq_raw: np.delete(dec_batch, -1, 0)
-}
-
+rnn_scope = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "rnn")
+rnn_train_step = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=rnn_scope)
 
 init = tf.global_variables_initializer()
 sess.run(init)
 
+for epoch in range(2000):
+    loss_epoch = 0.0
+    # loop through batches
+    for batch_ind in range(len(batches)):
+        qlen = batches[batch_ind][0].shape[0]
+        alen = batches[batch_ind][1].shape[0]
+        batch_size = 500 if qlen<20 and alen<20 else 100
 
-r = sess.run(log1, feed_dict=feed_dict)
-r1 = sess.run(log2, feed_dict=feed_dict)
+        n = batches[batch_ind][0].shape[0]
+        indices = [random.randint(0, n - 1) for _ in range(batch_size)]
+        enc_batch = np.transpose(np.take(batches[batch_ind][0], indices, axis=0)).astype(np.int32)
+        dec_batch = np.transpose(np.take(batches[batch_ind][1], indices, axis=0)).astype(np.int32)
 
-print(r)
+        train_dict = {
+            input_seq: enc_batch,
+            dec_input_seq_raw: np.delete(dec_batch, 0, 0),
+            dec_output_seq_raw: np.delete(dec_batch, -1, 0)
+        }
+        batch_loss, _ = sess.run([loss, rnn_train_step], feed_dict=train_dict)
+        loss_epoch += batch_loss
+
+    if epoch % 100 == 0:
+        print(loss_epoch)
+
+
+if True:
+    saver = tf.train.Saver()
+    save_path = saver.save(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
+    print("Model saved in file: %s" % save_path)
 
 sess.close()

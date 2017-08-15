@@ -61,11 +61,11 @@ y = data[:, 1]
 plt.scatter(x, y)
 # plt.show()
 
-# # clustering
-# clustering_results = kmeans.kmeans(data,weights,k)
-#
-# # storing results
-# pickle.dump(clustering_results, open("clustering_results.pickle","wb"))
+# clustering
+#clustering_results = kmeans.kmeans(data,weights,k)
+
+# storing results
+#pickle.dump(clustering_results, open("clustering_results.pickle","wb"))
 
 clustering_results = pickle.load(open("clustering_results.pickle", "rb"))
 
