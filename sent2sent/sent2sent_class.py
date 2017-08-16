@@ -73,18 +73,26 @@ loss_elem = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=tf.reshape(log
 loss = tf.reduce_mean(loss_elem)
 
 rnn_scope = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "rnn")
-rnn_train_step = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=rnn_scope)
+# rnn_train_step = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=rnn_scope)
+rnn_train_step = tf.train.GradientDescentOptimizer(0.01).minimize(loss, var_list=rnn_scope)
+
 
 init = tf.global_variables_initializer()
+
+
+print(dec_input_seq.shape)
+print(dec_input_seq_raw.shape)
+sys.exit()
+
 sess.run(init)
 
-for epoch in range(2000):
+for epoch in range(1000):
     loss_epoch = 0.0
     # loop through batches
     for batch_ind in range(len(batches)):
         qlen = batches[batch_ind][0].shape[0]
         alen = batches[batch_ind][1].shape[0]
-        batch_size = 500 if qlen<20 and alen<20 else 100
+        batch_size = 200 if qlen<20 and alen<20 else 100
 
         n = batches[batch_ind][0].shape[0]
         indices = [random.randint(0, n - 1) for _ in range(batch_size)]
@@ -96,11 +104,12 @@ for epoch in range(2000):
             dec_input_seq_raw: np.delete(dec_batch, 0, 0),
             dec_output_seq_raw: np.delete(dec_batch, -1, 0)
         }
+
         batch_loss, _ = sess.run([loss, rnn_train_step], feed_dict=train_dict)
         loss_epoch += batch_loss
 
-    if epoch % 100 == 0:
-        print(loss_epoch)
+    if epoch % 1 == 0:
+        print(str(epoch) + ") loss = " + str(loss_epoch))
 
 
 if True:
