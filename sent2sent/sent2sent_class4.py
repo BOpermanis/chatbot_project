@@ -53,14 +53,19 @@ def inv_embed_fun(rep):
 embed_seq = tf.map_fn(embed_fun, input_seq, dtype=tf.float32, name="embed_seq")
 dec_input_seq = tf.map_fn(embed_fun, dec_input_seq_raw, dtype=tf.float32, name="dec_input_seq")
 
-encoder_cell1 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
-encoder_cell2 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
-encoder_cell = tf.nn.rnn_cell.MultiRNNCell([encoder_cell1,encoder_cell2])
+# e1 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+# e2 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+# e3 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+# encoder_cell = tf.nn.rnn_cell.MultiRNNCell([e1, e2, e3])
+#
+# d1 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+# d2 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+# d3 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+# decoder_cell = tf.nn.rnn_cell.MultiRNNCell([d1,d2,d3])
 
-decoder_cell1 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
-decoder_cell2 = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
-decoder_cell = tf.nn.rnn_cell.MultiRNNCell([decoder_cell1, decoder_cell2])
+encoder_cell = tf.nn.rnn_cell.MultiRNNCell([tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)]*3)
 
+decoder_cell = tf.nn.rnn_cell.MultiRNNCell([tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)]*3)
 
 ## ENCODING
 with tf.variable_scope("rnn/encoding"):
@@ -107,7 +112,7 @@ loss = tf.reduce_mean(loss_elem)
 with tf.variable_scope("train"):
     # rnn_scope = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "rnn")
     # rnn_train_step = tf.train.AdamOptimizer(0.001).minimize(loss, var_list=rnn_scope)
-    rnn_train_step = tf.train.AdamOptimizer(0.0001).minimize(loss)
+    rnn_train_step = tf.train.AdamOptimizer(0.000001).minimize(loss)
 
 
 
@@ -123,42 +128,25 @@ sess.run(init)
 # saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
 # embedmod.import_model(sess)
 
-
 saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='rnn')+
                                  tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='embeddings'))
-saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
+saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model1.ckpt")
 
 
 # saves graph
 # writer = tf.summary.FileWriter(sent2sent_logdir)
 # writer.add_graph(sess.graph)
 
-# batch_ind = 0
-# batch_size = 1
-# n = batches[batch_ind][0].shape[0]
-# indices = [random.randint(0, n - 1) for _ in range(batch_size)]
-# enc_batch = np.transpose(np.take(batches[batch_ind][0], indices, axis=0)).astype(np.int32)
-# dec_batch = np.transpose(np.take(batches[batch_ind][1], indices, axis=0)).astype(np.int32)
-# train_dict = {
-#     input_seq: enc_batch,
-#     dec_input_seq_raw: np.delete(dec_batch, 0, 0),
-#     dec_output_seq_raw: np.delete(dec_batch, -1, 0)
-# }
-# sess.run(dec_output_seq_raw, feed_dict=train_dict)
-# sess.run(dec_input_seq_raw, feed_dict=train_dict)
-# sess.run(input_seq, feed_dict=train_dict)
-# sess.close()
-
 
 try:
-    for epoch in range(20):
+    for epoch in range(100):
         loss_epoch = []
         # loop through batches
         a = datetime.datetime.now()
         for batch_ind in range(len(batches)):
             qlen = batches[batch_ind][0].shape[0]
             alen = batches[batch_ind][1].shape[0]
-            batch_size = 200 if qlen < 20 and alen < 20 else 100
+            batch_size = 300 if qlen < 30 and alen < 30 else 50
 
             n = batches[batch_ind][0].shape[0]
             indices = [random.randint(0, n - 1) for _ in range(batch_size)]
@@ -183,11 +171,11 @@ except KeyboardInterrupt:
 
 
 # saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='rnn'))
-saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='rnn')+
+saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='rnn') +
                                  tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='embeddings'))
 if True:
     # saver = tf.train.Saver()
-    save_path = saver.save(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
+    save_path = saver.save(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model1.ckpt")
     print("Model saved in file: %s" % save_path)
 
 sess.close()

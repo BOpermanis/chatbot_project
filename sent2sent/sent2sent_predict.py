@@ -35,7 +35,11 @@ input_seq = tf.placeholder(tf.int32, shape=[None, None], name="input_seq")
 
 #  placeholders for decoder
 dec_input_seq_raw = tf.placeholder(tf.int32, shape=[None, None], name="dec_output_seq_raw")
-thought_vector_place = tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size], name="thought_vector_place")
+# thought_vector_place = tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size], name="thought_vector_place")
+thought_vector_place = (tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size]),
+                        tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size]),
+                        tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size]))
+
 dec_output_seq_raw = tf.placeholder(tf.int32, shape=[None, None], name="dec_output_seq_raw")
 
 # embedding
@@ -49,8 +53,9 @@ def inv_embed_fun(rep):
 embed_seq = tf.map_fn(embed_fun, input_seq, dtype=tf.float32, name="embed_seq")
 dec_input_seq = tf.map_fn(embed_fun, dec_input_seq_raw, dtype=tf.float32, name="dec_input_seq")
 
-encoder_cell = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
-decoder_cell = tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)
+encoder_cell = tf.nn.rnn_cell.MultiRNNCell([tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)]*3)
+
+decoder_cell = tf.nn.rnn_cell.MultiRNNCell([tf.contrib.rnn.GRUCell(num_units=embedmod.embedding_size)]*3)
 
 ## ENCODING
 with tf.variable_scope("rnn/encoding"):
@@ -105,7 +110,7 @@ sess = tf.Session()
 # saver = tf.train.Saver(rnn_scope)
 # saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model4.ckpt")
 saver = tf.train.Saver()
-saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
+saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model1.ckpt")
 
 
 
@@ -114,7 +119,10 @@ saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
 # input_sent = "Tell me a story !".split(" ")
 # input_sent = "It is a big city !".split(" ")
 # input_sent = "Best wins !".split(" ")
-
+# input_sent = "What is Your name ?".split(" ")
+# input_sent = "Are You going to school ?".split(" ")
+# input_sent = "Are You a hero ?".split(" ")
+input_sent = "How old are You ?".split(" ")
 
 input_sent_coded = [revdictionary[w] for w in ["_START"] + [w1.lower() for w1 in input_sent] + ["_EOS"]]
 input_sent_coded = np.asarray(input_sent_coded).reshape([len(input_sent_coded), 1]).astype(np.int32)
@@ -129,6 +137,7 @@ state = sess.run(thought_vector, feed_dict={
 })
 
 
+
 ws = []
 next_word_ind = revdictionary['_START']
 end = revdictionary['_EOS']
@@ -139,14 +148,17 @@ for i in range(30):
     # print(i)
     # current_word, current_word_ind, state1 = get_next_word(i, state)
 
-    if isinstance(state, tuple):
+    if i > 0:
         state = state[0]
+        state = tuple(s[0, :, :] for s in state)
 
-    if len(state.shape) > 2:
-        state = state[0, :, :]
+    # if len(state.shape) > 2:
+    #     state = state[0, :, :]
 
     if isinstance(next_word_ind, np.ndarray):
         next_word_ind = next_word_ind[0]
+
+
 
     next_word_ind, state = sess.run([w_ind,decoder_output], feed_dict={
         thought_vector_place: state, #np.random.random_sample((1,512)).astype(np.float32)
