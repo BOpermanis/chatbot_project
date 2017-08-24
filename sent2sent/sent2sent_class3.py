@@ -27,7 +27,7 @@ data_set_size = len(first_word)
 
 embedmod = embedding_model(vocabulary_size=vocabulary_size)
 
-sess = embedmod.import_session(beeing_integrated=True)
+# sess = embedmod.import_session(beeing_integrated=True)
 
 # placeholder for batch  :  batch_size X seq_len
 input_seq = tf.placeholder(tf.int32, shape=[None, None], name="input_seq")
@@ -72,18 +72,23 @@ loss_elem = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=tf.reshape(log
                                                            labels=tf.reshape(dec_output_seq_raw, [-1]))
 loss = tf.reduce_mean(loss_elem)
 
-rnn_scope = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "rnn")
-rnn_train_step = tf.train.AdamOptimizer(0.001).minimize(loss, var_list=rnn_scope)
-# rnn_train_step = tf.train.GradientDescentOptimizer(0.001).minimize(loss, var_list=rnn_scope)
+with tf.variable_scope("train"):
+    rnn_scope = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "rnn")
+    rnn_train_step = tf.train.AdamOptimizer(0.0001).minimize(loss, var_list=rnn_scope)
 
 
 init = tf.global_variables_initializer()
+
+sess = tf.Session()
 sess.run(init)
 
-# saver = tf.train.Saver()
-# saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
 
-for epoch in range(100):
+# importing all models
+embedmod.import_model(sess)
+# saver = tf.train.Saver(rnn_scope)
+# saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model2.ckpt")
+
+for epoch in range(50):
     loss_epoch = 0.0
     # loop through batches
     for batch_ind in range(len(batches)):
@@ -109,9 +114,10 @@ for epoch in range(100):
         print(str(epoch) + ") loss = " + str(loss_epoch))
 
 
+saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='rnn'))
 if True:
     # saver = tf.train.Saver()
-    save_path = saver.save(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model1.ckpt")
+    save_path = saver.save(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model3.ckpt")
     print("Model saved in file: %s" % save_path)
 
 sess.close()

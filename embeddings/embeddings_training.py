@@ -25,7 +25,7 @@ data_set_size = len(first_word)
 
 model = embedding_model(vocabulary_size=vocabulary_size)
 
-model.train(first_word, second_word,num_steps=2001)
+model.train(first_word, second_word,num_steps=1001)
 
 # #checking result
 # model.import_session()

@@ -1,6 +1,18 @@
-import numpy as np
+from __future__ import print_function
 
-arr = np.array([[1,2,3,4], [5,6,7,8], [9,10,11,12]])
+import tensorflow as tf
 
+# Simple hello world using TensorFlow
 
-print(np.delete(arr, -1, 0))
+# Create a Constant op
+# The op is added as a node to the default graph.
+#
+# The value returned by the constructor represents the output
+# of the Constant op.
+hello = tf.constant('Hello, TensorFlow!')
+
+# Start tf session
+sess = tf.Session()
+
+# Run the op
+print(sess.run(hello))

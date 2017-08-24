@@ -3,6 +3,7 @@ import numpy as np
 
 import sys, os, pickle, math
 import random
+import datetime
 
 home_dir = "/media/bruno/data/chatbot_project/"
 embedding_dir = home_dir + "embeddings/"
@@ -10,6 +11,7 @@ sent2sent_dir = home_dir + "sent2sent/"
 
 sys.path.append(embedding_dir)
 from embeddings_class2 import embedding_model
+
 
 first_word, second_word = pickle.load( open(home_dir + "embed_dataset.pickle", "rb" ) )
 dictionary = pickle.load( open(home_dir + "dictionary.pickle", "rb" ) )
@@ -25,14 +27,16 @@ data_set_size = len(first_word)
 
 
 embedmod = embedding_model(vocabulary_size=vocabulary_size)
+
 # sess = embedmod.import_session(beeing_integrated=True)
 
-# placeholders
+# placeholder for batch  :  batch_size X seq_len
 input_seq = tf.placeholder(tf.int32, shape=[None, None], name="input_seq")
-thought_vector_place = tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size], name="thought_vector_place")
 
 #  placeholders for decoder
 dec_input_seq_raw = tf.placeholder(tf.int32, shape=[None, None], name="dec_output_seq_raw")
+thought_vector_place = tf.placeholder(tf.float32, shape=[1, embedmod.embedding_size], name="thought_vector_place")
+dec_output_seq_raw = tf.placeholder(tf.int32, shape=[None, None], name="dec_output_seq_raw")
 
 # embedding
 def embed_fun(input):
@@ -55,88 +59,105 @@ with tf.variable_scope("rnn/encoding"):
                                           # initial_state=zero_state,
                                           dtype=tf.float32,
                                           time_major=True)
-print(thought_vector)
-print(thought_vector_place)
 
 ## DECODING
+
+
 with tf.variable_scope("rnn/decoding"):
-    decoder_output, _ = tf.nn.dynamic_rnn(cell=decoder_cell,
-                                          inputs=dec_input_seq,
-                                          initial_state=thought_vector_place,
-                                          dtype=tf.float32,
-                                          time_major=True)
 
 
-logits = tf.map_fn(inv_embed_fun, decoder_output, dtype=tf.float32, name="logits")
+    # initial_tuple = (thought_vector,
+    #                  tf.one_hot(dec_input_seq_raw[0, :], vocabulary_size))
+    initial_tuple = (thought_vector_place,
+                     tf.one_hot(dec_input_seq_raw[0, :], vocabulary_size))
+
+    def fn(prev, input0):
+        state, logits0 = prev
+        # live_feedback = tf.matmul(tf.nn.softmax(logits0), embedmod.embeddings)
+
+        # half live feedback, half previous word
+        # input = tf.divide(live_feedback + input0, 2)
+        state1, state_tuple = decoder_cell(inputs=input0, state=state)
+        lin_output = inv_embed_fun(state1)
+
+        return state_tuple, lin_output
 
 
-w_dist = tf.nn.softmax(logits[0,:,:])
+    # running RNN for sequance lengths
+    decoder_output = tf.scan(fn,
+                          elems=dec_input_seq,
+                          initializer=initial_tuple)
+
+    # formating linear outputs
+    logits = decoder_output[1]
+
+
+w_dist = tf.nn.softmax(logits[0, :, :])
 w_ind = tf.argmax(w_dist, axis=1)
 
 
-sess = tf.Session()
 rnn_scope = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "rnn")
-sent2sent_saver = tf.train.Saver(rnn_scope)
-sent2sent_saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model2.ckpt")
 
-embedmod.import_model(sess)
+sess = tf.Session()
 
-# input_sent = ["What", "is", "Your", "name", "?"]
-input_sent = "You are my friend".split(" ")
+# importing all models
+# embedmod.import_model(sess)
+# saver = tf.train.Saver(rnn_scope)
+# saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model4.ckpt")
+saver = tf.train.Saver()
+saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model.ckpt")
+
+
+
+
+# input_sent = "What is up ?".split(" ")
+# input_sent = "Tell me a story !".split(" ")
+# input_sent = "It is a big city !".split(" ")
+# input_sent = "Best wins !".split(" ")
 
 
 input_sent_coded = [revdictionary[w] for w in ["_START"] + [w1.lower() for w1 in input_sent] + ["_EOS"]]
 input_sent_coded = np.asarray(input_sent_coded).reshape([len(input_sent_coded), 1]).astype(np.int32)
 
+# l = [4,5,6,7,4,5,6,7,4,5,6,7,4,5,6,7,4,5,6,7,4,5,6,7]
+# input_sent_coded = np.asarray([l]).astype(np.int32).reshape([len(l),1])
 
 
-def get_next_word(current_word,state):
-    next_word_ind, state = sess.run([w_ind, decoder_output], feed_dict={
-        thought_vector_place: state,
-        dec_input_seq_raw: np.asarray([[current_word]])
-    })
-    next_word = dictionary[next_word_ind[0]]
-    return next_word, next_word_ind[0], state[0, :, :]
-
-
-
-### actual ENCODING
+### ENCODING
 state = sess.run(thought_vector, feed_dict={
     input_seq: input_sent_coded,
 })
 
-current_word_ind = revdictionary["_START"]
-
-
-### actual DECODING
-# output_sent = []
-# for i in range(20):
-#     current_word, current_word_ind, state1 = get_next_word(current_word_ind, state)
-#     print(np.sum(state))
-#     output_sent.append(current_word)
-#     state = np.copy(state1)
-#     if current_word==revdictionary["_END"]:
-#         break
-
 
 ws = []
-next_word_ind = revdictionary["_START"]
+next_word_ind = revdictionary['_START']
+end = revdictionary['_EOS']
 
-for w in range(20):
+
+### DECODING
+for i in range(30):
+    # print(i)
     # current_word, current_word_ind, state1 = get_next_word(i, state)
-    if len(state.shape)>2:
-        state = state[0,:,:]
 
-    if isinstance(next_word_ind,np.ndarray):
+    if isinstance(state, tuple):
+        state = state[0]
+
+    if len(state.shape) > 2:
+        state = state[0, :, :]
+
+    if isinstance(next_word_ind, np.ndarray):
         next_word_ind = next_word_ind[0]
 
-    next_word_ind, state = sess.run([w_ind, decoder_output], feed_dict={
+    next_word_ind, state = sess.run([w_ind,decoder_output], feed_dict={
         thought_vector_place: state, #np.random.random_sample((1,512)).astype(np.float32)
         dec_input_seq_raw: np.asarray([[next_word_ind]])
     })
-    print(next_word_ind.shape)
+
+    if next_word_ind==end:
+        break
     ws.append(dictionary[next_word_ind[0]])
 
 
 print(ws)
+
 sess.close()

@@ -105,7 +105,7 @@ class Seq2SeqModel(object):
 
     # The seq2seq function: we use embedding for the input and attention.
     def seq2seq_f(encoder_inputs, decoder_inputs, do_decode):
-      return tf.nn.seq2seq.embedding_attention_seq2seq(
+      return tf.contrib.seq2seq.embedding_attention_seq2seq(
           encoder_inputs, decoder_inputs, cell,
           num_encoder_symbols=source_vocab_size,
           num_decoder_symbols=target_vocab_size,
@@ -132,7 +132,7 @@ class Seq2SeqModel(object):
 
     # Training outputs and losses.
     if forward_only:
-      self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
+      self.outputs, self.losses = tf.contrib.seq2seq.model_with_buckets(
           self.encoder_inputs, self.decoder_inputs, targets,
           self.target_weights, buckets, lambda x, y: seq2seq_f(x, y, True),
           softmax_loss_function=softmax_loss_function)
@@ -144,7 +144,7 @@ class Seq2SeqModel(object):
               for output in self.outputs[b]
           ]
     else:
-      self.outputs, self.losses = tf.nn.seq2seq.model_with_buckets(
+      self.outputs, self.losses = tf.contrib.seq2seq.model_with_buckets(
           self.encoder_inputs, self.decoder_inputs, targets,
           self.target_weights, buckets,
           lambda x, y: seq2seq_f(x, y, False),
