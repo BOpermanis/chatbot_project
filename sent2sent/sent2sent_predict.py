@@ -121,8 +121,9 @@ saver.restore(sess, sent2sent_dir + "sent2sent_checkpoint/sent2sent_model1.ckpt"
 # input_sent = "Best wins !".split(" ")
 # input_sent = "What is Your name ?".split(" ")
 # input_sent = "Are You going to school ?".split(" ")
-# input_sent = "Are You a hero ?".split(" ")
-input_sent = "How old are You ?".split(" ")
+input_sent = "Are You smart ?".split(" ")
+# input_sent = "How old are You ?".split(" ")
+
 
 input_sent_coded = [revdictionary[w] for w in ["_START"] + [w1.lower() for w1 in input_sent] + ["_EOS"]]
 input_sent_coded = np.asarray(input_sent_coded).reshape([len(input_sent_coded), 1]).astype(np.int32)
