@@ -2,6 +2,8 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import collections
+import multiprocessing
+from pathos.multiprocessing import ProcessingPool as Pool
 
 
 def dist(x,y):
@@ -87,6 +89,33 @@ def kmeans(data,weights,k,n=None,n_per_cluster=None,B=10):
     return results[opt][0], results[opt][1]
 
 
+def kmeans_parallel(data,weights,k,n=None,n_per_cluster=None,B=10):
+
+    if n is None:
+        n = data.shape[0]
+
+    if n_per_cluster is None:
+        n_per_cluster = int(np.ceil(sum(weights) / k))
+
+    def processInput(b):
+        print(b)
+        return kmeansOnceWeights(data, weights, k, n, n_per_cluster)
+
+    # inputs = [(b, data, weights, k, n, n_per_cluster) for b in range(B)]
+    inputs = range(B)
+    num_cores = multiprocessing.cpu_count()
+
+    with Pool(num_cores-1) as p:
+        results = p.map(processInput, inputs)
+
+    inner_diffs = [r[2] for r in results]
+    opt = np.argmin(inner_diffs)
+
+    counter = collections.Counter(results[opt][1])
+    print(counter)
+
+    return results[opt][0], results[opt][1]
+
 
 if __name__=="__main__":
     home_dir = "/media/bruno/data/chatbot_project/sent2sent"
@@ -100,7 +129,7 @@ if __name__=="__main__":
 
     B = 10
     print(data.shape)
-    ids, closest_cluster = kmeans(data, weights, k)
+    ids, closest_cluster = kmeans_parallel(data, weights, k)
 
     for k0 in ids:
         indices = [i for i, cl in enumerate(closest_cluster) if cl == k0]

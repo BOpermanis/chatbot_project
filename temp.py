@@ -1,18 +1,12 @@
-from __future__ import print_function
+from multiprocessing import Pool
 
-import tensorflow as tf
+def g(a,b):
+    return a*b
 
-# Simple hello world using TensorFlow
+def f(x):
+    print(x)
+    return g(x,x)
 
-# Create a Constant op
-# The op is added as a node to the default graph.
-#
-# The value returned by the constructor represents the output
-# of the Constant op.
-hello = tf.constant('Hello, TensorFlow!')
-
-# Start tf session
-sess = tf.Session()
-
-# Run the op
-print(sess.run(hello))
+if __name__ == '__main__':
+    with Pool(4) as p:
+        print(p.map(f, range(100)))
