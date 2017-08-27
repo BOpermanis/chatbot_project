@@ -26,7 +26,7 @@ convs = [con for con in convs if len(con) <= 10]
 for i in range(len(convs)):
     con = convs[i]
     for k in range(10-len(con)):
-        convs[i].append([revdictionary["_END"]])
+        convs[i].append([revdictionary["_START"], revdictionary["_END"]])
 
 
 def get_sizes(con):
@@ -42,12 +42,12 @@ weights = counts.values
 k = int(round(sum(weights)/400))
 
 # clustering
-# clustering_results = kmeans.kmeans_parallel(data, weights, k)
+clustering_results = kmeans.kmeans_parallel(data, weights, k, B=6)
 
 # storing results
-# pickle.dump(clustering_results, open("clustering_results_conv.pickle","wb"))
+pickle.dump(clustering_results, open("clustering_results_conv.pickle","wb"))
 
-clustering_results = pickle.load(open("clustering_results_conv.pickle", "rb"))
+# clustering_results = pickle.load(open("clustering_results_conv.pickle", "rb"))
 
 
 ### batching
@@ -61,10 +61,6 @@ for k0 in ids:
     lookup.update(dict(pairs))
 
 cons["batch_id"] = cons['sizes'].map(lambda x: lookup[x])
-
-
-
-
 
 
 
@@ -94,6 +90,11 @@ for k0 in ids:
         conv.append(np.asarray([make_longer(x, mlen) for x in sents]).astype(np.int32))
     batches.append(tuple(conv))
 
-pickle.dump(batches,open(home_dir + "batches_conv.pickle", "wb"))
+
+
+
+pickle.dump(batches, open(home_dir + "batches_conv.pickle", "wb"))
 
 # batches = pickle.load(open(home_dir + "batches_conv.pickle", "rb"))
+
+

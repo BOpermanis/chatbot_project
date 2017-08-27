@@ -15,8 +15,6 @@ sent2sent_logdir = home_dir + "sent2sent/logdir/"
 sys.path.append(embedding_dir)
 from embeddings_class2 import embedding_model
 
-
-first_word, second_word = pickle.load( open(home_dir + "embed_dataset.pickle", "rb" ) )
 dictionary = pickle.load( open(home_dir + "dictionary.pickle", "rb" ) )
 revdictionary = pickle.load( open(home_dir + "revdictionary.pickle", "rb" ) )
 batches = pickle.load( open(home_dir + "batches.pickle", "rb" ) )
@@ -24,11 +22,6 @@ batches = pickle.load( open(home_dir + "batches.pickle", "rb" ) )
 
 
 vocabulary_size = len(dictionary)
-data_set_size = len(first_word)
-
-
-vocabulary_size = len(dictionary)
-data_set_size = len(first_word)
 
 
 class sent2sent_model:
@@ -50,6 +43,45 @@ class sent2sent_model:
     def inv_embed_fun(self, rep):
         return tf.matmul(rep, self.embedmod.nce_weights)
 
+
+    def encoding_fun(self,input_seq):
+
+        embed_seq = tf.map_fn(self.embed_fun, input_seq, dtype=tf.float32)
+
+        encoder_cell = tf.nn.rnn_cell.MultiRNNCell(
+            [tf.contrib.rnn.GRUCell(num_units=self.embedmod.embedding_size)] * self.rnn_layers)
+
+        with tf.variable_scope("sent2sent"):
+            with tf.variable_scope("rnn/encoding") as scope:
+                # tf.get_variable_scope().reuse_variables()
+                scope.reuse_variables()
+                _, thought_vector = tf.nn.dynamic_rnn(cell=encoder_cell,
+                                                           inputs=embed_seq,
+                                                           # initial_state=zero_state,
+                                                           dtype=tf.float32,
+                                                           time_major=True)
+        return thought_vector
+
+    def decoding_fun(self, input_seq, thought_vector):
+
+        dec_input_seq = tf.map_fn(self.embed_fun, input_seq, dtype=tf.float32)
+
+        decoder_cell = tf.nn.rnn_cell.MultiRNNCell(
+            [tf.contrib.rnn.GRUCell(num_units=self.embedmod.embedding_size)] * self.rnn_layers)
+
+        with tf.variable_scope("sent2sent"):
+            with tf.variable_scope("rnn/decoding") as scope:
+                scope.reuse_variables()
+                decoder_output, last_state = tf.nn.dynamic_rnn(cell=decoder_cell,
+                                                           inputs=dec_input_seq,
+                                                           initial_state=thought_vector,
+                                                           dtype=tf.float32,
+                                                           time_major=True)
+        logits = tf.map_fn(self.inv_embed_fun, decoder_output, dtype=tf.float32, name="logits")
+
+        return logits, last_state
+
+
     def build_rnn(self, train=True):
         """
         Builds RNN graphs
@@ -57,7 +89,7 @@ class sent2sent_model:
         self.rnn_graph_built = True
 
         with tf.variable_scope("sent2sent"):
-            # placeholder for batch  :  batch_size X seq_len
+            # placeholder for batch  :  seq_len X batch_size
             self.input_seq = tf.placeholder(tf.int32, shape=[None, None], name="input_seq")
             self.dec_input_seq_raw = tf.placeholder(tf.int32, shape=[None, None], name="dec_output_seq_raw")
             self.dec_output_seq_raw = tf.placeholder(tf.int32, shape=[None, None], name="dec_output_seq_raw")
