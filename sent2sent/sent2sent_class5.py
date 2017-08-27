@@ -26,7 +26,7 @@ vocabulary_size = len(dictionary)
 
 class sent2sent_model:
 
-    def __init__(self, rnn_layers=3):
+    def __init__(self, rnn_layers=2):
         """
         Initializes model
         """
@@ -141,7 +141,7 @@ class sent2sent_model:
     def train(self, learning_rate, max_epochs=50, train_scope=["embeddings","sent2sent"],
                     restore_scope=["embeddings", "sent2sent"],
                     save_scope=["embeddings", "sent2sent"],
-                    ckpt_path=sent2sent_dir+"sent2sent_checkpoint/sent2sent_model.ckpt"):
+                    ckpt_path=sent2sent_dir+"sent2sent_checkpoint/sent2sent_model2.ckpt"):
         """
         runs training
         """
@@ -221,13 +221,14 @@ class sent2sent_model:
         sess.close()
 
 
-    def initialize_chatbot(self,ckpt_path=sent2sent_dir+"sent2sent_checkpoint/sent2sent_model.ckpt"):
+    def initialize_chatbot(self,ckpt_path=sent2sent_dir+"sent2sent_checkpoint/sent2sent_model2.ckpt"):
         if not self.rnn_graph_built:
             self.rnn_graph_built = True
             self.build_rnn(train=False)
 
         self.sess = tf.Session()
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "embeddings")+
+                                        tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "sent2sent"))
         saver.restore(self.sess, ckpt_path)
 
 
@@ -273,8 +274,10 @@ if __name__ == "__main__":
 
     model = sent2sent_model()
 
-    # model.train(learning_rate=0.000001, max_epochs=15) #, save_scope=[])
-
+    # model.train(learning_rate=0.001, max_epochs=50,restore_scope=[]) #, save_scope=[])
+    # model.train(learning_rate=0.0001, max_epochs=50)
+    # model.train(learning_rate=0.00001, max_epochs=50)
+    # model.train(learning_rate=0.0000001, max_epochs=50)
 
     qs = ["Are You smart ?",
           "What is up ?",
@@ -290,7 +293,9 @@ if __name__ == "__main__":
           "God is everywhere !",
           "Ninja style !",
           "shut up !",
-          "Any advice ?"]
+          "Any advice ?",
+          "Are You sexy ?",
+          "How tall are You ?"]
 
     for q in qs:
         a = model.answer_something(q)

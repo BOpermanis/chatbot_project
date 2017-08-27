@@ -8,6 +8,11 @@ import datetime
 home_dir = "/media/bruno/data/chatbot_project/"
 embedding_dir = home_dir + "embeddings/"
 sent2sent_dir = home_dir + "sent2sent/"
+conproc_dir = home_dir + "sent2sent/"
+
+
+ckpt_path=conproc_dir+"conproc_checkpoint/sent2sent_model.ckpt"
+
 
 sent2sent_logdir = home_dir + "sent2sent/logdir/"
 
@@ -73,11 +78,7 @@ with tf.variable_scope("conproc"):
 # unstacking for replying
 s0 = tf.unstack(con_out, axis=0)
 
-# tf.split(s0, num_split=, split_dim=1)
-# tf.split(split_dim=1, num_split=3, value=s0)
 
-
-i = 0
 states = []
 logits = []
 last_states = []
@@ -85,7 +86,7 @@ loss_elems = []
 losses = []
 
 for i in range(5):
-    state = tuple(tf.split(value=s0[i], num_or_size_splits=3, axis=1))
+    state = tuple(tf.split(value=s0[i], num_or_size_splits=sent2sent.rnn_layers, axis=1))
 
     logit, last_state = sent2sent.decoding_fun(dec_input_seq_raw[i], state)
 
@@ -100,46 +101,73 @@ for i in range(5):
     loss_elems.append(loss_elem)
     losses.append(loss)
 
+
 abs_loss = sum(losses)
 train_col = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "conproc")
-train_step = tf.train.AdamOptimizer(0.0001).minimize(abs_loss, var_list=train_col)
+# train_step = tf.train.AdamOptimizer(0.0001).minimize(abs_loss, var_list=train_col)
 
-
-batch_ind = 0
-
-batch = batches[batch_ind]
-
-train_dict = dict()
+train_step = tf.train.AdamOptimizer(0.00001).minimize(abs_loss)
 
 init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
 
-for i_round in range(5):
-    i_q = i_round * 2
-    i_a = i_round * 2 + 1
-
-    max_seq_len = max([batch[i].shape[1] for i in range(len(batch))])
-
-    # batch_size = 200 if max_seq_len < 30 else 50
-    batch_size = 1
-
-    n = batches[batch_ind][0].shape[0]
-    indices = [random.randint(0, n - 1) for _ in range(batch_size)]
-    enc_batch = np.transpose(np.take(batch[i_q], indices, axis=0)).astype(np.int32)
-    dec_batch = np.transpose(np.take(batch[i_a], indices, axis=0)).astype(np.int32)
-
-    train_dict[input_seq[i_round]] = enc_batch
-    print(np.delete(dec_batch, -1, 0).shape)
-    train_dict[dec_input_seq_raw[i_round]] = np.delete(dec_batch, -1, 0)
-    train_dict[dec_output_seq_raw[i_round]] = np.delete(dec_batch, 0, 0)
+sent2sent.initialize_chatbot()
 
 
 
-# batch_loss, _ = sess.run([abs_loss, train_step], feed_dict=train_dict)
-# loss_epoch.append(batch_loss)
+restore_col = []
+for scope in ["embeddings", "sent2sent", "conproc"]:
+    restore_col = restore_col + tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
 
-v = sess.run(thought_vectors, feed_dict=train_dict)
-type(v)
+save_col = []
+for scope in ["embeddings", "sent2sent", "conproc"]:
+    save_col = save_col + tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
+
+
+
+saver = tf.train.Saver(var_list=restore_col)
+save_path = saver.restore(sess, ckpt_path)
+
+for epoch in range(10):
+    step_loss = []
+    start = datetime.datetime.now()
+    for batch_ind in range(len(batches)):
+        batch = batches[batch_ind]
+
+        train_dict = dict()
+
+        max_seq_len = max([batch[i].shape[1] for i in range(len(batch))])
+
+        if max_seq_len < 50:
+            for i_round in range(5):
+                i_q = i_round * 2
+                i_a = i_round * 2 + 1
+
+                batch_size = 100 if max_seq_len < 30 else 30
+                # batch_size = 1
+
+                n = batches[batch_ind][0].shape[0]
+                indices = [random.randint(0, n - 1) for _ in range(batch_size)]
+                enc_batch = np.transpose(np.take(batch[i_q], indices, axis=0)).astype(np.int32)
+                dec_batch = np.transpose(np.take(batch[i_a], indices, axis=0)).astype(np.int32)
+
+                train_dict[input_seq[i_round]] = enc_batch
+                train_dict[dec_input_seq_raw[i_round]] = np.delete(dec_batch, -1, 0)
+                train_dict[dec_output_seq_raw[i_round]] = np.delete(dec_batch, 0, 0)
+
+            batch_loss, _ = sess.run([abs_loss, train_step], feed_dict=train_dict)
+            step_loss.append(batch_loss)
+
+    end = datetime.datetime.now()
+
+    if epoch % 1 == 0:
+        print(str(epoch) + ") loss = " + str(np.mean(step_loss)) + ", time spent = " + str(end-start))
+
+
+
+
+saver = tf.train.Saver(var_list=save_col)
+save_path = saver.save(sess, ckpt_path)
 
 sess.close()
